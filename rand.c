@@ -21,48 +21,45 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <stdio.h>
+#ifdef _WIN32
+#include <time.h>
+#else
+#include <assert.h>
+#endif
+
 #include "rand.h"
 
-#ifndef RAND_PLATFORM_INDEPENDENT
+static FILE *frand = NULL;
 
-
-#pragma message("NOT SUITABLE FOR PRODUCTION USE!")
-
-// The following code is not supposed to be used in a production environment.
-// It's included only to make the library testable.
-// The message above tries to prevent any accidental use outside of the test environment.
-//
-// You are supposed to replace the random32() function with your own secure code.
-// There is also a possibility to replace the random_buffer() function as it is defined as a weak symbol.
-
-#include <stdio.h>
-#include <time.h>
+int finalize_rand(void)
+{
+#ifdef _WIN32
+	return 0;
+#else
+	if (!frand) return 0;
+	int err = fclose(frand);
+	frand = NULL;
+	return err;
+#endif
+}
 
 uint32_t random32(void)
 {
-	static int initialized = 0;
-	if (!initialized) {
-		srand((unsigned)time(NULL));
-		initialized = 1;
+#ifdef _WIN32
+	srand((unsigned)time(NULL));
+	return ((rand() % 0xFF) | ((rand() % 0xFF) << 8) | ((rand() % 0xFF) << 16) | ((rand() % 0xFF) << 24));
+#else
+	uint32_t r;
+	size_t len = sizeof(r);
+	if (!frand) {
+		frand = fopen("/dev/urandom", "r");
 	}
-	return ((rand() & 0xFF) | ((rand() & 0xFF) << 8) | ((rand() & 0xFF) << 16) | ((uint32_t) (rand() & 0xFF) << 24));
-}
-
-#endif /* RAND_PLATFORM_INDEPENDENT */
-
-//
-// The following code is platform independent
-//
-
-void __attribute__((weak)) random_buffer(uint8_t *buf, size_t len)
-{
-	uint32_t r = 0;
-	for (size_t i = 0; i < len; i++) {
-		if (i % 4 == 0) {
-			r = random32();
-		}
-		buf[i] = (r >> ((i % 4) * 8)) & 0xFF;
-	}
+	size_t len_read = fread(&r, 1, len, frand);
+	(void)len_read;
+	assert(len_read == len);
+	return r;
+#endif
 }
 
 uint32_t random_uniform(uint32_t n)
@@ -72,11 +69,31 @@ uint32_t random_uniform(uint32_t n)
 	return x / (max / n);
 }
 
+void random_buffer(uint8_t *buf, size_t len)
+{
+#ifdef _WIN32
+	srand((unsigned)time(NULL));
+	size_t i;
+	for (i = 0; i < len; i++) {
+		buf[i] = rand() % 0xFF;
+	}
+#else
+	if (!frand) {
+		frand = fopen("/dev/urandom", "r");
+	}
+	size_t len_read = fread(buf, 1, len, frand);
+	(void)len_read;
+	assert(len_read == len);
+#endif
+}
+
 void random_permute(char *str, size_t len)
 {
-	for (int i = len - 1; i >= 1; i--) {
-		int j = random_uniform(i + 1);
-		char t = str[j];
+	int i, j;
+	char t;
+	for (i = len - 1; i >= 1; i--) {
+		j = random_uniform(i + 1);
+		t = str[j];
 		str[j] = str[i];
 		str[i] = t;
 	}

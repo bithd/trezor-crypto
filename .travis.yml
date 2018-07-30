@@ -10,24 +10,23 @@ addons:
   apt:
     packages:
     - check
+    - cmake
+    - cmake-data
     - libssl-dev
-    - python3-pip
+    - python-pip
     - valgrind
 
-env:
-  global:
-    - PYTHON=python3
-
 install:
-  - $PYTHON -m pip install --user pytest ecdsa curve25519-donna pyasn1
+  - pip install --user pytest ecdsa curve25519-donna
 
 script:
   - make
-  - ./tests/aestst
-  - ./tests/test_check
-  - CK_TIMEOUT_MULTIPLIER=20 valgrind -q --error-exitcode=1 ./tests/test_check
-  - ./tests/test_openssl 1000
-  - ITERS=10 $PYTHON -m pytest tests/
+  - ./aes/aestst
+  - ./test_check
+  - CK_TIMEOUT_MULTIPLIER=20 valgrind -q --error-exitcode=1 ./test_check
+  - ./test_openssl 1000
+  - ITERS=10 py.test
+  - mkdir _build && cd _build && cmake .. && make && cd ..
 
 notifications:
   webhooks:

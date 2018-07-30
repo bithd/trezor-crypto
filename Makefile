@@ -23,16 +23,13 @@ CFLAGS   += $(OPTFLAGS) \
             -Wformat-security \
             -Werror
 
-VALGRIND ?= 1
-
 CFLAGS += -I.
-CFLAGS += -DVALGRIND=$(VALGRIND)
+CFLAGS += -Iaes
+CFLAGS += -Ichacha20poly1305
+CFLAGS += -Ied25519-donna
 CFLAGS += -DUSE_ETHEREUM=1
 CFLAGS += -DUSE_GRAPHENE=1
 CFLAGS += -DUSE_NEM=1
-CFLAGS += -DUSE_MONERO=1
-CFLAGS += -DUSE_CARDANO=1
-CFLAGS += $(shell pkg-config --cflags openssl)
 
 # disable certain optimizations and features when small footprint is required
 ifdef SMALL
@@ -45,48 +42,40 @@ SRCS  += script.c
 SRCS  += ripemd160.c
 SRCS  += sha2.c
 SRCS  += sha3.c
-SRCS  += hasher.c
 SRCS  += aes/aescrypt.c aes/aeskey.c aes/aestab.c aes/aes_modes.c
 SRCS  += ed25519-donna/curve25519-donna-32bit.c ed25519-donna/curve25519-donna-helpers.c ed25519-donna/modm-donna-32bit.c
 SRCS  += ed25519-donna/ed25519-donna-basepoint-table.c ed25519-donna/ed25519-donna-32bit-tables.c ed25519-donna/ed25519-donna-impl-base.c
 SRCS  += ed25519-donna/ed25519.c ed25519-donna/curve25519-donna-scalarmult-base.c ed25519-donna/ed25519-sha3.c ed25519-donna/ed25519-keccak.c
-SRCS  += blake256.c
 SRCS  += blake2b.c blake2s.c
-SRCS  += groestl.c
 SRCS  += chacha20poly1305/chacha20poly1305.c chacha20poly1305/chacha_merged.c chacha20poly1305/poly1305-donna.c chacha20poly1305/rfc7539.c
 SRCS  += rc4.c
 SRCS  += nem.c
-SRCS  += segwit_addr.c cash_addr.c
-SRCS  += memzero.c
+SRCS  += segwit_addr.c
 
 OBJS   = $(SRCS:.c=.o)
 
-TESTLIBS = $(shell pkg-config --libs check) -lpthread -lm
-TESTSSLLIBS = $(shell pkg-config --libs openssl)
+TESTLIBS = $(shell pkg-config --libs check) -lrt -lpthread -lm
+TESTSSLLIBS = -lcrypto
 
-all: tools tests
+all: test_check test_openssl test_speed aes/aestst tools libtrezor-crypto.so
 
 %.o: %.c %.h options.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-tests: tests/test_check tests/test_openssl tests/test_speed tests/libtrezor-crypto.so tests/aestst
-
-tests/aestst: aes/aestst.o aes/aescrypt.o aes/aeskey.o aes/aestab.o
+aes/aestst: aes/aestst.o aes/aescrypt.o aes/aeskey.o aes/aestab.o
 	$(CC) $^ -o $@
 
-tests/test_check.o: tests/test_check_cardano.h tests/test_check_cashaddr.h tests/test_check_segwit.h
+test_check: test_check.o $(OBJS)
+	$(CC) test_check.o $(OBJS) $(TESTLIBS) -o test_check
 
-tests/test_check: tests/test_check.o $(OBJS)
-	$(CC) tests/test_check.o $(OBJS) $(TESTLIBS) -o tests/test_check
+test_speed: test_speed.o $(OBJS)
+	$(CC) test_speed.o $(OBJS) -o test_speed
 
-tests/test_speed: tests/test_speed.o $(OBJS)
-	$(CC) tests/test_speed.o $(OBJS) -o tests/test_speed
+test_openssl: test_openssl.o $(OBJS)
+	$(CC) test_openssl.o $(OBJS) $(TESTSSLLIBS) -o test_openssl
 
-tests/test_openssl: tests/test_openssl.o $(OBJS)
-	$(CC) tests/test_openssl.o $(OBJS) $(TESTSSLLIBS) -o tests/test_openssl
-
-tests/libtrezor-crypto.so: $(SRCS)
-	$(CC) $(CFLAGS) -DAES_128 -DAES_192 -fPIC -shared $(SRCS) -o tests/libtrezor-crypto.so
+libtrezor-crypto.so: $(SRCS)
+	$(CC) $(CFLAGS) -fPIC -shared $(SRCS) -o libtrezor-crypto.so
 
 tools: tools/xpubaddrgen tools/mktable tools/bip39bruteforce
 
@@ -101,5 +90,5 @@ tools/bip39bruteforce: tools/bip39bruteforce.o $(OBJS)
 
 clean:
 	rm -f *.o aes/*.o chacha20poly1305/*.o ed25519-donna/*.o
-	rm -f tests/test_check tests/test_speed tests/test_openssl tests/libtrezor-crypto.so tests/aestst
+	rm -f test_check test_speed test_openssl libtrezor-crypto.so
 	rm -f tools/*.o tools/xpubaddrgen tools/mktable tools/bip39bruteforce

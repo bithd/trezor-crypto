@@ -31,20 +31,12 @@ void barrett_reduce256_modm(bignum256modm r, const bignum256modm q1, const bignu
 /* addition modulo m */
 void add256_modm(bignum256modm r, const bignum256modm x, const bignum256modm y);
 
-/* -x modulo m */
-void neg256_modm(bignum256modm r, const bignum256modm x);
-
-/* subtraction x-y modulo m */
-void sub256_modm(bignum256modm r, const bignum256modm x, const bignum256modm y);
-
 /* multiplication modulo m */
 void mul256_modm(bignum256modm r, const bignum256modm x, const bignum256modm y);
 
 void expand256_modm(bignum256modm out, const unsigned char *in, size_t len);
 
 void expand_raw256_modm(bignum256modm out, const unsigned char in[32]);
-
-int is_reduced256_modm(const bignum256modm in);
 
 void contract256_modm(unsigned char out[32], const bignum256modm in);
 

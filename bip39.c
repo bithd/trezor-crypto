@@ -31,7 +31,7 @@
 #include "pbkdf2.h"
 #include "bip39_english.h"
 #include "options.h"
-#include "memzero.h"
+#include "macros.h"
 
 #if USE_BIP39_CACHE
 
@@ -54,7 +54,7 @@ const char *mnemonic_generate(int strength)
 	uint8_t data[32];
 	random_buffer(data, 32);
 	const char *r = mnemonic_from_data(data, strength / 8);
-	memzero(data, sizeof(data));
+	MEMSET_BZERO(data, sizeof(data));
 	return r;
 }
 
@@ -66,7 +66,7 @@ const uint16_t *mnemonic_generate_indexes(int strength)
 	uint8_t data[32];
 	random_buffer(data, 32);
 	const uint16_t *r = mnemonic_from_data_indexes(data, strength / 8);
-	memzero(data, sizeof(data));
+	MEMSET_BZERO(data, sizeof(data));
 	return r;
 }
 
@@ -100,7 +100,7 @@ const char *mnemonic_from_data(const uint8_t *data, int len)
 		*p = (i < mlen - 1) ? ' ' : 0;
 		p++;
 	}
-	memzero(bits, sizeof(bits));
+	MEMSET_BZERO(bits, sizeof(bits));
 
 	return mnemo;
 }
@@ -131,19 +131,20 @@ const uint16_t *mnemonic_from_data_indexes(const uint8_t *data, int len)
 		}
 		mnemo[i] = idx;
 	}
-	memzero(bits, sizeof(bits));
+	MEMSET_BZERO(bits, sizeof(bits));
 
 	return mnemo;
 }
 
-int mnemonic_to_entropy(const char *mnemonic, uint8_t *entropy)
+int mnemonic_check(const char *mnemonic)
 {
 	if (!mnemonic) {
 		return 0;
 	}
 
-	uint32_t i = 0, n = 0;
+	uint32_t i, n;
 
+	i = 0; n = 0;
 	while (mnemonic[i]) {
 		if (mnemonic[i] == ' ') {
 			n++;
@@ -151,18 +152,17 @@ int mnemonic_to_entropy(const char *mnemonic, uint8_t *entropy)
 		i++;
 	}
 	n++;
-
 	// check number of words
 	if (n != 12 && n != 18 && n != 24) {
 		return 0;
 	}
 
 	char current_word[10];
-	uint32_t j, k, ki, bi = 0;
+	uint32_t j, k, ki, bi;
 	uint8_t bits[32 + 1];
 
-	memzero(bits, sizeof(bits));
-	i = 0;
+	MEMSET_BZERO(bits, sizeof(bits));
+	i = 0; bi = 0;
 	while (mnemonic[i]) {
 		j = 0;
 		while (mnemonic[i] != ' ' && mnemonic[i] != 0) {
@@ -173,9 +173,7 @@ int mnemonic_to_entropy(const char *mnemonic, uint8_t *entropy)
 			i++; j++;
 		}
 		current_word[j] = 0;
-		if (mnemonic[i] != 0) {
-			i++;
-		}
+		if (mnemonic[i] != 0) i++;
 		k = 0;
 		for (;;) {
 			if (!wordlist[k]) { // word not found
@@ -196,27 +194,16 @@ int mnemonic_to_entropy(const char *mnemonic, uint8_t *entropy)
 	if (bi != n * 11) {
 		return 0;
 	}
-	memcpy(entropy, bits, sizeof(bits));
-	return n * 11;
-}
-
-int mnemonic_check(const char *mnemonic)
-{
-	uint8_t bits[32 + 1];
-	int seed_len = mnemonic_to_entropy(mnemonic, bits);
-	if (seed_len != (12 * 11) && seed_len != (18 * 11) && seed_len != (24 * 11)) {
-		return 0;
-	}
-	int words = seed_len / 11;
-
-	uint8_t checksum = bits[words * 4 / 3];
-	sha256_Raw(bits, words * 4 / 3, bits);
-	if (words == 12) {
-		return (bits[0] & 0xF0) == (checksum & 0xF0); // compare first 4 bits
-	} else if (words == 18) {
-		return (bits[0] & 0xFC) == (checksum & 0xFC); // compare first 6 bits
-	} else if (words == 24) {
-		return bits[0] == checksum; // compare 8 bits
+	bits[32] = bits[n * 4 / 3];
+	sha256_Raw(bits, n * 4 / 3, bits);
+	if (n == 12) {
+		return (bits[0] & 0xF0) == (bits[32] & 0xF0); // compare first 4 bits
+	} else
+	if (n == 18) {
+		return (bits[0] & 0xFC) == (bits[32] & 0xFC); // compare first 6 bits
+	} else
+	if (n == 24) {
+		return bits[0] == bits[32]; // compare 8 bits
 	}
 	return 0;
 }
@@ -254,7 +241,7 @@ void mnemonic_to_seed(const char *mnemonic, const char *passphrase, uint8_t seed
 		}
 	}
 	pbkdf2_hmac_sha512_Final(&pctx, seed);
-	memzero(salt, sizeof(salt));
+	MEMSET_BZERO(salt, sizeof(salt));
 #if USE_BIP39_CACHE
 	// store to cache
 	if (mnemoniclen < 256 && passphraselen < 64) {

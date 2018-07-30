@@ -25,7 +25,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "aes/aes.h"
+#include "aes.h"
 #include "address.h"
 #include "bignum.h"
 #include "hmac.h"
@@ -35,69 +35,43 @@
 #include "sha3.h"
 #include "ripemd160.h"
 #include "base58.h"
+#include "macros.h"
 #include "curves.h"
 #include "secp256k1.h"
 #include "nist256p1.h"
-#include "ed25519-donna/ed25519.h"
-#include "ed25519-donna/ed25519-sha3.h"
+#include "ed25519.h"
+#include "ed25519-sha3.h"
 #if USE_KECCAK
-#include "ed25519-donna/ed25519-keccak.h"
+#include "ed25519-keccak.h"
 #endif
 #if USE_NEM
 #include "nem.h"
 #endif
-#if USE_CARDANO
-#include "ed25519-donna/modm-donna-32bit.h"
-#include "blake2b.h"
-#include "bip39.h"
-#endif
-#include "memzero.h"
 
 const curve_info ed25519_info = {
-	.bip32_name = "ed25519 seed",
-	.params = NULL,
-	.hasher_bip32 = HASHER_SHA2,
-	.hasher_base58 = HASHER_SHA2D,
-	.hasher_sign = HASHER_SHA2D,
-	.hasher_pubkey = HASHER_SHA2,
-};
-
-const curve_info ed25519_cardano_info = {
-	.bip32_name = "ed25519 cardano seed",
-	.params = NULL,
-	.hasher_bip32 = HASHER_SHA2,
-	.hasher_base58 = HASHER_SHA2D,
-	.hasher_sign = HASHER_SHA2D,
-	.hasher_pubkey = HASHER_SHA2,
+	/* bip32_name */
+	"ed25519 seed",
+	0
 };
 
 const curve_info ed25519_sha3_info = {
-	.bip32_name = "ed25519-sha3 seed",
-	.params = NULL,
-	.hasher_bip32 = HASHER_SHA2,
-	.hasher_base58 = HASHER_SHA2D,
-	.hasher_sign = HASHER_SHA2D,
-	.hasher_pubkey = HASHER_SHA2,
+	/* bip32_name */
+	"ed25519-sha3 seed",
+	0
 };
 
 #if USE_KECCAK
 const curve_info ed25519_keccak_info = {
-	.bip32_name = "ed25519-keccak seed",
-	.params = NULL,
-	.hasher_bip32 = HASHER_SHA2,
-	.hasher_base58 = HASHER_SHA2D,
-	.hasher_sign = HASHER_SHA2D,
-	.hasher_pubkey = HASHER_SHA2,
+	/* bip32_name */
+	"ed25519-keccak seed",
+	0
 };
 #endif
 
 const curve_info curve25519_info = {
-	.bip32_name = "curve25519 seed",
-	.params = NULL,
-	.hasher_bip32 = HASHER_SHA2,
-	.hasher_base58 = HASHER_SHA2D,
-	.hasher_sign = HASHER_SHA2D,
-	.hasher_pubkey = HASHER_SHA2,
+	/* bip32_name */
+	"curve25519 seed",
+	0
 };
 
 int hdnode_from_xpub(uint32_t depth, uint32_t child_num, const uint8_t *chain_code, const uint8_t *public_key, const char* curve, HDNode *out)
@@ -113,8 +87,7 @@ int hdnode_from_xpub(uint32_t depth, uint32_t child_num, const uint8_t *chain_co
 	out->depth = depth;
 	out->child_num = child_num;
 	memcpy(out->chain_code, chain_code, 32);
-	memzero(out->private_key, 32);
-	memzero(out->private_key_extension,32);
+	MEMSET_BZERO(out->private_key, 32);
 	memcpy(out->public_key, public_key, 33);
 	return 1;
 }
@@ -135,7 +108,7 @@ int hdnode_from_xprv(uint32_t depth, uint32_t child_num, const uint8_t *chain_co
 				failed = true;
 			}
 		}
-		memzero(&a, sizeof(a));
+		MEMSET_BZERO(&a, sizeof(a));
 	}
 
 	if (failed) {
@@ -147,8 +120,7 @@ int hdnode_from_xprv(uint32_t depth, uint32_t child_num, const uint8_t *chain_co
 	out->child_num = child_num;
 	memcpy(out->chain_code, chain_code, 32);
 	memcpy(out->private_key, private_key, 32);
-	memzero(out->public_key, sizeof(out->public_key));
-	memzero(out->private_key_extension, sizeof(out->private_key_extension));
+	MEMSET_BZERO(out->public_key, sizeof(out->public_key));
 	return 1;
 }
 
@@ -179,12 +151,12 @@ int hdnode_from_seed(const uint8_t *seed, int seed_len, const char* curve, HDNod
 			hmac_sha512_Update(&ctx, I, sizeof(I));
 			hmac_sha512_Final(&ctx, I);
 		}
-		memzero(&a, sizeof(a));
+		MEMSET_BZERO(&a, sizeof(a));
 	}
 	memcpy(out->private_key, I, 32);
 	memcpy(out->chain_code, I + 32, 32);
-	memzero(out->public_key, sizeof(out->public_key));
-	memzero(I, sizeof(I));
+	MEMSET_BZERO(out->public_key, sizeof(out->public_key));
+	MEMSET_BZERO(I, sizeof(I));
 	return 1;
 }
 
@@ -194,10 +166,10 @@ uint32_t hdnode_fingerprint(HDNode *node)
 	uint32_t fingerprint;
 
 	hdnode_fill_public_key(node);
-	hasher_Raw(node->curve->hasher_bip32, node->public_key, 33, digest);
+	sha256_Raw(node->public_key, 33, digest);
 	ripemd160(digest, 32, digest);
-	fingerprint = ((uint32_t) digest[0] << 24) + (digest[1] << 16) + (digest[2] << 8) + digest[3];
-	memzero(digest, sizeof(digest));
+	fingerprint = (digest[0] << 24) + (digest[1] << 16) + (digest[2] << 8) + digest[3];
+	MEMSET_BZERO(digest, sizeof(digest));
 	return fingerprint;
 }
 
@@ -258,205 +230,15 @@ int hdnode_private_ckd(HDNode *inout, uint32_t i)
 	memcpy(inout->chain_code, I + 32, 32);
 	inout->depth++;
 	inout->child_num = i;
-	memzero(inout->public_key, sizeof(inout->public_key));
+	MEMSET_BZERO(inout->public_key, sizeof(inout->public_key));
 
 	// making sure to wipe our memory
-	memzero(&a, sizeof(a));
-	memzero(&b, sizeof(b));
-	memzero(I, sizeof(I));
-	memzero(data, sizeof(data));
+	MEMSET_BZERO(&a, sizeof(a));
+	MEMSET_BZERO(&b, sizeof(b));
+	MEMSET_BZERO(I, sizeof(I));
+	MEMSET_BZERO(data, sizeof(data));
 	return 1;
 }
-
-#if USE_CARDANO
-static void multiply8(uint8_t *dst, uint8_t *src, int bytes)
-{
-	uint8_t prev_acc = 0;
-	for (int i = 0; i < bytes; i++) {
-		dst[i] = (src[i] << 3) + (prev_acc & 0x8);
-		prev_acc = src[i] >> 5;
-	}
-}
-
-static void add_256bits(uint8_t *dst, uint8_t *src1, uint8_t *src2)
-{
-	for (int i = 0; i < 32; i++) {
-		uint8_t a = src1[i];
-		uint8_t b = src2[i];
-		uint16_t r = a + b;
-		dst[i] = r & 0xff;
-	}
-}
-
-static int ed25519_scalar_add(const uint8_t *sk1, const uint8_t *sk2, uint8_t *res)
-{
-	bignum256modm s1, s2;
-	expand256_modm(s1, sk1, 32);
-	expand256_modm(s2, sk2, 32);
-	add256_modm(s1, s1, s2);
-	contract256_modm(res, s1);
-	return 0;
-}
-
-int hdnode_private_ckd_cardano(HDNode *inout, uint32_t i)
-{
-	// checks for hardened/non-hardened derivation, keysize 32 means we are dealing with public key and thus non-h, keysize 64 is for private key
-	int keysize = 32;
-	if (i & 0x80000000) {
-		keysize = 64;
-	}
-
-	static CONFIDENTIAL uint8_t data[1 + 64 + 4];
-	static CONFIDENTIAL uint8_t I[32 + 32];
-	static CONFIDENTIAL bignum256 a, b;
-	static CONFIDENTIAL uint8_t priv_key[64];
-	static CONFIDENTIAL uint8_t res_key[64];
-
-	memcpy(priv_key, inout->private_key, 32);
-	memcpy(priv_key + 32, inout->private_key_extension, 32);
-
-	if (keysize == 64) { // private derivation
-		data[0] = 0;
-		memcpy(data + 1, inout->private_key, 32);
-		memcpy(data + 1 + 32, inout->private_key_extension, 32);
-	} else { // public derivation
-		hdnode_fill_public_key(inout);
-		data[0] = 2;
-		memcpy(data + 1, inout->public_key + 1, 32);
-	}
-	write_be(data + keysize + 1, i);
-
-	bn_read_be(priv_key, &a);
-
-	static CONFIDENTIAL HMAC_SHA512_CTX ctx;
-	hmac_sha512_Init(&ctx, inout->chain_code, 32);
-	hmac_sha512_Update(&ctx, data, 1 + keysize + 4);
-	hmac_sha512_Final(&ctx, I);
-
-	static CONFIDENTIAL uint8_t zl8[32];
-	multiply8(zl8,I,32);
-	ed25519_scalar_add(zl8,priv_key,res_key);
-	add_256bits(res_key+32,I+32,priv_key+32);
-	memcpy(inout->private_key, res_key, 32);
-	memcpy(inout->private_key_extension, res_key + 32, 32);
-
-	if (keysize == 64) {
-		data[0] = 1;
-	} else {
-		data[0] = 3;
-	}
-	hmac_sha512_Init(&ctx, inout->chain_code, 32);
-	hmac_sha512_Update(&ctx, data, 1 + keysize + 4);
-	hmac_sha512_Final(&ctx, I);
-
-	memcpy(inout->chain_code, I + 32, 32);
-	inout->depth++;
-	inout->child_num = i;
-	memzero(inout->public_key, sizeof(inout->public_key));
-
-	// making sure to wipe our memory
-	memzero(&a, sizeof(a));
-	memzero(&b, sizeof(b));
-	memzero(I, sizeof(I));
-	memzero(data, sizeof(data));
-	memzero(priv_key, sizeof(priv_key));
-	memzero(res_key, sizeof(res_key));
-	return 1;
-}
-
-int hdnode_from_seed_cardano(uint8_t *seed, int seed_len, HDNode *out) {
-	uint8_t hash[32];
-	uint8_t cbor[32+2];
-
-	if (seed_len < 24) {
-		// cbor encodes length directly into first byte if its smaller than 24
-		seed[1] = 64 | seed_len; 
-		blake2b(seed + 1, seed_len + 1, hash, 32);
-	} else {
-		seed[0] = 88;
-		seed[1] = seed_len;
-		blake2b(seed, seed_len + 2, hash, 32);
-	}
-
-	cbor[0] = 88; // 64 means its byte array, 24 means its length has 8 bits
-	cbor[1] = 32; // length of the byte array
-	memcpy(cbor + 2, hash, 32);
-	uint8_t salt[21];
-	memcpy(salt, "Root Seed Chain ", 16);
-	uint8_t hmac[64];
-	uint8_t secret[64];
-	uint8_t public[32];
-	uint8_t chain_code[32];
-	int failed = 1;
-	memset(out, 0, sizeof(HDNode));
-	out->depth = 0;
-	out->child_num = 0;
-	out->curve = get_curve_by_name(ED25519_CARDANO_NAME);
-
-	int saltlen;
-	static CONFIDENTIAL HMAC_SHA512_CTX ctx;
-	for (int i = 1; i <= 1000; i++){
-		hmac_sha512_Init(&ctx, cbor, 34);
-		if (i < 10) {
-			salt[16] = '0' + (i);
-			saltlen = 16 + 1;
-		} else if (i < 100) {
-			salt[16] = '0' + (i / 10);
-			salt[17] = '0' + (i % 10);
-			saltlen = 16 + 2;
-		} else if (i < 1000) {
-			salt[16] = '0' + (i / 100);
-			salt[17] = '0' + ((i / 10) % 10);
-			salt[18] = '0' + (i % 10);
-			saltlen = 16 + 3;
-		} else {
-			salt[16] = '0' + (i / 1000);
-			salt[17] = '0' + ((i / 100) % 10);
-			salt[18] = '0' + ((i / 10) % 10);
-			salt[19] = '0' + (i % 10);
-			saltlen = 16 + 4;
-		}
-		hmac_sha512_Update(&ctx, salt, saltlen);
-		hmac_sha512_Final(&ctx, hmac);
-		ed25519_publickey(hmac, public);
-		sha512_Raw(hmac, 32, secret);
-		secret[0] &= 248;
-		secret[31] &= 127;
-		secret[31] |= 64;
-		if (secret[31] & 0x20) {
-			continue;
-		}
-		memcpy(chain_code, hmac + 32, 32);
-		failed = 0;
-		break;
-	}
-
-	memzero(hash, sizeof(hash));
-	memzero(cbor, sizeof(cbor));
-	memzero(salt, sizeof(salt));
-
-	if (failed) {
-		memzero(seed, sizeof(seed));
-		memzero(secret, sizeof(secret));
-		memzero(chain_code, sizeof(chain_code));
-		memzero(hmac, sizeof(hmac));
-		return 0;
-	}
-
-	memcpy(out->private_key, secret, 32);
-	memcpy(out->private_key_extension, secret + 32, 32);
-
-	memcpy(out->chain_code, chain_code, 32);
-	out->public_key[0] = 1;
-	memcpy(out->public_key + 1, public, 32);
-	memzero(seed, sizeof(seed));
-	memzero(secret, sizeof(secret));
-	memzero(chain_code, sizeof(chain_code));
-	memzero(hmac, sizeof(hmac));
-
-	return 1;
-}
-#endif
 
 int hdnode_public_ckd_cp(const ecdsa_curve *curve, const curve_point *parent, const uint8_t *parent_chain_code, uint32_t i, curve_point *child, uint8_t *child_chain_code) {
 	uint8_t data[1 + 32 + 4];
@@ -476,16 +258,16 @@ int hdnode_public_ckd_cp(const ecdsa_curve *curve, const curve_point *parent, co
 		bn_read_be(I, &c);
 		if (bn_is_less(&c, &curve->order)) { // < order
 			scalar_multiply(curve, &c, child); // b = c * G
-			point_add(curve, parent, child);   // b = a + b
+			point_add(curve, parent, child);       // b = a + b
 			if (!point_is_infinity(child)) {
 				if (child_chain_code) {
 					memcpy(child_chain_code, I + 32, 32);
 				}
 
 				// Wipe all stack data.
-				memzero(data, sizeof(data));
-				memzero(I, sizeof(I));
-				memzero(&c, sizeof(c));
+				MEMSET_BZERO(data, sizeof(data));
+				MEMSET_BZERO(I, sizeof(I));
+				MEMSET_BZERO(&c, sizeof(c));
 				return 1;
 			}
 		}
@@ -505,20 +287,20 @@ int hdnode_public_ckd(HDNode *inout, uint32_t i)
 	if (!hdnode_public_ckd_cp(inout->curve->params, &parent, inout->chain_code, i, &child, inout->chain_code)) {
 		return 0;
 	}
-	memzero(inout->private_key, 32);
+	memset(inout->private_key, 0, 32);
 	inout->depth++;
 	inout->child_num = i;
 	inout->public_key[0] = 0x02 | (child.y.val[0] & 0x01);
 	bn_write_be(&child.x, inout->public_key + 1);
 
 	// Wipe all stack data.
-	memzero(&parent, sizeof(parent));
-	memzero(&child, sizeof(child));
+	MEMSET_BZERO(&parent, sizeof(parent));
+	MEMSET_BZERO(&child, sizeof(child));
 
 	return 1;
 }
 
-void hdnode_public_ckd_address_optimized(const curve_point *pub, const uint8_t *chain_code, uint32_t i, uint32_t version, HasherType hasher_pubkey, HasherType hasher_base58, char *addr, int addrsize, int addrformat)
+void hdnode_public_ckd_address_optimized(const curve_point *pub, const uint8_t *chain_code, uint32_t i, uint32_t version, char *addr, int addrsize, int addrformat)
 {
 	uint8_t child_pubkey[33];
 	curve_point b;
@@ -529,10 +311,10 @@ void hdnode_public_ckd_address_optimized(const curve_point *pub, const uint8_t *
 
 	switch (addrformat) {
 		case 1: // Segwit-in-P2SH
-			ecdsa_get_address_segwit_p2sh(child_pubkey, version, hasher_pubkey, hasher_base58, addr, addrsize);
+			ecdsa_get_address_segwit_p2sh(child_pubkey, version, addr, addrsize);
 			break;
 		default: // normal address
-			ecdsa_get_address(child_pubkey, version, hasher_pubkey, hasher_base58, addr, addrsize);
+			ecdsa_get_address(child_pubkey, version, addr, addrsize);
 			break;
 	}
 }
@@ -568,7 +350,7 @@ int hdnode_private_ckd_cached(HDNode *inout, const uint32_t *i, size_t i_count, 
 	if (!private_ckd_cache_root_set || memcmp(&private_ckd_cache_root, inout, sizeof(HDNode)) != 0) {
 		// clear the cache
 		private_ckd_cache_index = 0;
-		memzero(private_ckd_cache, sizeof(private_ckd_cache));
+		memset(private_ckd_cache, 0, sizeof(private_ckd_cache));
 		// setup new root
 		memcpy(&private_ckd_cache_root, inout, sizeof(HDNode));
 		private_ckd_cache_root_set = true;
@@ -577,8 +359,8 @@ int hdnode_private_ckd_cached(HDNode *inout, const uint32_t *i, size_t i_count, 
 		int j;
 		for (j = 0; j < BIP32_CACHE_SIZE; j++) {
 			if (private_ckd_cache[j].set &&
-				private_ckd_cache[j].depth == i_count - 1 &&
-				memcmp(private_ckd_cache[j].i, i, (i_count - 1) * sizeof(uint32_t)) == 0 &&
+			    private_ckd_cache[j].depth == i_count - 1 &&
+			    memcmp(private_ckd_cache[j].i, i, (i_count - 1) * sizeof(uint32_t)) == 0 &&
 				private_ckd_cache[j].node.curve == inout->curve) {
 				memcpy(inout, &(private_ckd_cache[j].node), sizeof(HDNode));
 				found = true;
@@ -614,21 +396,19 @@ int hdnode_private_ckd_cached(HDNode *inout, const uint32_t *i, size_t i_count, 
 void hdnode_get_address_raw(HDNode *node, uint32_t version, uint8_t *addr_raw)
 {
 	hdnode_fill_public_key(node);
-	ecdsa_get_address_raw(node->public_key, version, node->curve->hasher_pubkey, addr_raw);
+	ecdsa_get_address_raw(node->public_key, version, addr_raw);
 }
 
 void hdnode_get_address(HDNode *node, uint32_t version, char *addr, int addrsize)
 {
 	hdnode_fill_public_key(node);
-	ecdsa_get_address(node->public_key, version, node->curve->hasher_pubkey, node->curve->hasher_base58, addr, addrsize);
+	ecdsa_get_address(node->public_key, version, addr, addrsize);
 }
 
 void hdnode_fill_public_key(HDNode *node)
 {
 	if (node->public_key[0] != 0)
 		return;
-
-#if USE_BIP32_25519_CURVES
 	if (node->curve->params) {
 		ecdsa_get_public_key33(node->curve->params, node->private_key, node->public_key);
 	} else {
@@ -643,16 +423,8 @@ void hdnode_fill_public_key(HDNode *node)
 #endif
 		} else if (node->curve == &curve25519_info) {
 			curve25519_scalarmult_basepoint(node->public_key + 1, node->private_key);
-#if USE_CARDANO
-		} else if (node->curve == &ed25519_cardano_info) {
-			ed25519_publickey_ext(node->private_key, node->private_key_extension, node->public_key + 1);
-#endif
 		}
 	}
-#else
-
-	ecdsa_get_public_key33(node->curve->params, node->private_key, node->public_key);
-#endif
 }
 
 #if USE_ETHEREUM
@@ -706,7 +478,7 @@ int hdnode_get_nem_shared_key(const HDNode *node, const ed25519_public_key peer_
 	return 1;
 }
 
-int hdnode_nem_encrypt(const HDNode *node, const ed25519_public_key public_key, const uint8_t *iv_immut, const uint8_t *salt, const uint8_t *payload, size_t size, uint8_t *buffer) {
+int hdnode_nem_encrypt(const HDNode *node, const ed25519_public_key public_key, uint8_t *iv, const uint8_t *salt, const uint8_t *payload, size_t size, uint8_t *buffer) {
 	uint8_t last_block[AES_BLOCK_SIZE];
 	uint8_t remainder = size % AES_BLOCK_SIZE;
 
@@ -717,10 +489,6 @@ int hdnode_nem_encrypt(const HDNode *node, const ed25519_public_key public_key, 
 	// Pad new last block with number of missing bytes
 	memset(&last_block[remainder], AES_BLOCK_SIZE - remainder, AES_BLOCK_SIZE - remainder);
 
-	// the IV gets mutated, so we make a copy not to touch the original
-	uint8_t iv[AES_BLOCK_SIZE];
-	memcpy(iv, iv_immut, AES_BLOCK_SIZE);
-
 	uint8_t shared_key[SHA3_256_DIGEST_LENGTH];
 	if (!hdnode_get_nem_shared_key(node, public_key, salt, NULL, shared_key)) {
 		return 0;
@@ -729,7 +497,7 @@ int hdnode_nem_encrypt(const HDNode *node, const ed25519_public_key public_key, 
 	aes_encrypt_ctx ctx;
 
 	int ret = aes_encrypt_key256(shared_key, &ctx);
-	memzero(shared_key, sizeof(shared_key));
+	MEMSET_BZERO(shared_key, sizeof(shared_key));
 
 	if (ret != EXIT_SUCCESS) {
 		return 0;
@@ -756,7 +524,7 @@ int hdnode_nem_decrypt(const HDNode *node, const ed25519_public_key public_key, 
 	aes_decrypt_ctx ctx;
 
 	int ret = aes_decrypt_key256(shared_key, &ctx);
-	memzero(shared_key, sizeof(shared_key));
+	MEMSET_BZERO(shared_key, sizeof(shared_key));
 
 	if (ret != EXIT_SUCCESS) {
 		return 0;
@@ -772,10 +540,10 @@ int hdnode_nem_decrypt(const HDNode *node, const ed25519_public_key public_key, 
 
 // msg is a data to be signed
 // msg_len is the message length
-int hdnode_sign(HDNode *node, const uint8_t *msg, uint32_t msg_len, HasherType hasher_sign, uint8_t *sig, uint8_t *pby, int (*is_canonical)(uint8_t by, uint8_t sig[64]))
+int hdnode_sign(HDNode *node, const uint8_t *msg, uint32_t msg_len, uint8_t *sig, uint8_t *pby, int (*is_canonical)(uint8_t by, uint8_t sig[64]))
 {
 	if (node->curve->params) {
-		return ecdsa_sign(node->curve->params, hasher_sign, node->private_key, msg, msg_len, sig, pby, is_canonical);
+		return ecdsa_sign(node->curve->params, node->private_key, msg, msg_len, sig, pby, is_canonical);
 	} else if (node->curve == &curve25519_info) {
 		return 1;  // signatures are not supported
 	} else {
@@ -800,7 +568,7 @@ int hdnode_sign_digest(HDNode *node, const uint8_t *digest, uint8_t *sig, uint8_
 	} else if (node->curve == &curve25519_info) {
 		return 1;  // signatures are not supported
 	} else {
-		return hdnode_sign(node, digest, 32, 0, sig, pby, is_canonical);
+		return hdnode_sign(node, digest, 32, sig, pby, is_canonical);
 	}
 }
 
@@ -841,8 +609,8 @@ static int hdnode_serialize(const HDNode *node, uint32_t fingerprint, uint32_t v
 		node_data[45] = 0;
 		memcpy(node_data + 46, node->private_key, 32);
 	}
-	int ret = base58_encode_check(node_data, sizeof(node_data), node->curve->hasher_base58, str, strsize);
-	memzero(node_data, sizeof(node_data));
+	int ret = base58_encode_check(node_data, sizeof(node_data), str, strsize);
+	MEMSET_BZERO(node_data, sizeof(node_data));
 	return ret;
 }
 
@@ -857,24 +625,24 @@ int hdnode_serialize_private(const HDNode *node, uint32_t fingerprint, uint32_t 
 }
 
 // check for validity of curve point in case of public data not performed
-int hdnode_deserialize(const char *str, uint32_t version_public, uint32_t version_private, const char *curve, HDNode *node, uint32_t *fingerprint)
+int hdnode_deserialize(const char *str, uint32_t version_public, uint32_t version_private, HDNode *node, uint32_t *fingerprint)
 {
 	uint8_t node_data[78];
 	memset(node, 0, sizeof(HDNode));
-	node->curve = get_curve_by_name(curve);
-	if (base58_decode_check(str, node->curve->hasher_base58, node_data, sizeof(node_data)) != sizeof(node_data)) {
+	if (base58_decode_check(str, node_data, sizeof(node_data)) != sizeof(node_data)) {
 		return -1;
 	}
+	node->curve = get_curve_by_name(SECP256K1_NAME);
 	uint32_t version = read_be(node_data);
 	if (version == version_public) {
-		memzero(node->private_key, sizeof(node->private_key));
+		MEMSET_BZERO(node->private_key, sizeof(node->private_key));
 		memcpy(node->public_key, node_data + 45, 33);
 	} else if (version == version_private) { // private node
 		if (node_data[45]) { // invalid data
 			return -2;
 		}
 		memcpy(node->private_key, node_data + 46, 32);
-		memzero(node->public_key, sizeof(node->public_key));
+		MEMSET_BZERO(node->public_key, sizeof(node->public_key));
 	} else {
 		return -3; // invalid version
 	}
@@ -894,20 +662,11 @@ const curve_info *get_curve_by_name(const char *curve_name) {
 	if (strcmp(curve_name, SECP256K1_NAME) == 0) {
 		return &secp256k1_info;
 	}
-	if (strcmp(curve_name, SECP256K1_DECRED_NAME) == 0) {
-		return &secp256k1_decred_info;
-	}
-	if (strcmp(curve_name, SECP256K1_GROESTL_NAME) == 0) {
-		return &secp256k1_groestl_info;
-	}
 	if (strcmp(curve_name, NIST256P1_NAME) == 0) {
 		return &nist256p1_info;
 	}
 	if (strcmp(curve_name, ED25519_NAME) == 0) {
 		return &ed25519_info;
-	}
-	if (strcmp(curve_name, ED25519_CARDANO_NAME) == 0) {
-		return &ed25519_cardano_info;
 	}
 	if (strcmp(curve_name, ED25519_SHA3_NAME) == 0) {
 		return &ed25519_sha3_info;

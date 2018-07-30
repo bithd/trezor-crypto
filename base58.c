@@ -26,8 +26,8 @@
 #include <sys/types.h>
 #include "base58.h"
 #include "sha2.h"
+#include "macros.h"
 #include "ripemd160.h"
-#include "memzero.h"
 
 static const int8_t b58digits_map[] = {
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
@@ -114,13 +114,8 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58)
 	binu = bin;
 	for (i = 0; i < binsz; ++i)
 	{
-		if (binu[i]) {
-			if (zerocount > i) {
-				/* result too large */
-				return false;
-			}
+		if (binu[i])
 			break;
-		}
 		--*binszp;
 	}
 	*binszp += zerocount;
@@ -128,14 +123,15 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58)
 	return true;
 }
 
-int b58check(const void *bin, size_t binsz, HasherType hasher_type, const char *base58str)
+int b58check(const void *bin, size_t binsz, const char *base58str)
 {
 	unsigned char buf[32];
 	const uint8_t *binc = bin;
 	unsigned i;
 	if (binsz < 4)
 		return -4;
-	hasher_Raw(hasher_type, bin, binsz - 4, buf);
+	sha256_Raw(bin, binsz - 4, buf);
+	sha256_Raw(buf, 32, buf);
 	if (memcmp(&binc[binsz - 4], buf, 4))
 		return -1;
 
@@ -192,7 +188,7 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 	return true;
 }
 
-int base58_encode_check(const uint8_t *data, int datalen, HasherType hasher_type, char *str, int strsize)
+int base58_encode_check(const uint8_t *data, int datalen, char *str, int strsize)
 {
 	if (datalen > 128) {
 		return 0;
@@ -200,14 +196,15 @@ int base58_encode_check(const uint8_t *data, int datalen, HasherType hasher_type
 	uint8_t buf[datalen + 32];
 	uint8_t *hash = buf + datalen;
 	memcpy(buf, data, datalen);
-	hasher_Raw(hasher_type, data, datalen, hash);
+	sha256_Raw(data, datalen, hash);
+	sha256_Raw(hash, 32, hash);
 	size_t res = strsize;
 	bool success = b58enc(str, &res, buf, datalen + 4);
-	memzero(buf, sizeof(buf));
+	MEMSET_BZERO(buf, sizeof(buf));
 	return success ? res : 0;
 }
 
-int base58_decode_check(const char *str, HasherType hasher_type, uint8_t *data, int datalen)
+int base58_decode_check(const char *str, uint8_t *data, int datalen)
 {
 	if (datalen > 128) {
 		return 0;
@@ -218,7 +215,7 @@ int base58_decode_check(const char *str, HasherType hasher_type, uint8_t *data, 
 		return 0;
 	}
 	uint8_t *nd = d + datalen + 4 - res;
-	if (b58check(nd, res, hasher_type, str) < 0) {
+	if (b58check(nd, res, str) < 0) {
 		return 0;
 	}
 	memcpy(data, nd, res - 4);
@@ -257,7 +254,7 @@ int base58gph_encode_check(const uint8_t *data, int datalen, char *str, int strs
 	ripemd160(data, datalen, hash);  // No double SHA256, but a single RIPEMD160
 	size_t res = strsize;
 	bool success = b58enc(str, &res, buf, datalen + 4);
-	memzero(buf, sizeof(buf));
+	MEMSET_BZERO(buf, sizeof(buf));
 	return success ? res : 0;
 }
 

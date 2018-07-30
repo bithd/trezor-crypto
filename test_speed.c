@@ -8,8 +8,7 @@
 #include "bip32.h"
 #include "secp256k1.h"
 #include "nist256p1.h"
-#include "ed25519-donna/ed25519.h"
-#include "hasher.h"
+#include "ed25519.h"
 
 static uint8_t msg[256];
 
@@ -29,7 +28,7 @@ void bench_sign_secp256k1(int iterations)
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+		ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 	}
 }
 
@@ -42,7 +41,7 @@ void bench_sign_nist256p1(int iterations)
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+		ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 	}
 }
 
@@ -68,10 +67,10 @@ void bench_verify_secp256k1_33(int iterations)
 
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 	ecdsa_get_public_key33(curve, priv, pub);
-	ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+	ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_verify(curve, HASHER_SHA2, pub, sig, msg, sizeof(msg));
+		ecdsa_verify(curve, pub, sig, msg, sizeof(msg));
 	}
 }
 
@@ -83,10 +82,10 @@ void bench_verify_secp256k1_65(int iterations)
 
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 	ecdsa_get_public_key65(curve, priv, pub);
-	ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+	ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_verify(curve, HASHER_SHA2, pub, sig, msg, sizeof(msg));
+		ecdsa_verify(curve, pub, sig, msg, sizeof(msg));
 	}
 }
 
@@ -98,10 +97,10 @@ void bench_verify_nist256p1_33(int iterations)
 
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 	ecdsa_get_public_key33(curve, priv, pub);
-	ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+	ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_verify(curve, HASHER_SHA2, pub, sig, msg, sizeof(msg));
+		ecdsa_verify(curve, pub, sig, msg, sizeof(msg));
 	}
 }
 
@@ -113,10 +112,10 @@ void bench_verify_nist256p1_65(int iterations)
 
 	memcpy(priv, "\xc5\x5e\xce\x85\x8b\x0d\xdd\x52\x63\xf9\x68\x10\xfe\x14\x43\x7c\xd3\xb5\xe1\xfb\xd7\xc6\xa2\xec\x1e\x03\x1f\x05\xe8\x6d\x8b\xd5", 32);
 	ecdsa_get_public_key65(curve, priv, pub);
-	ecdsa_sign(curve, HASHER_SHA2, priv, msg, sizeof(msg), sig, &pby, NULL);
+	ecdsa_sign(curve, priv, msg, sizeof(msg), sig, &pby, NULL);
 
 	for (int i = 0 ; i < iterations; i++) {
-		ecdsa_verify(curve, HASHER_SHA2, pub, sig, msg, sizeof(msg));
+		ecdsa_verify(curve, pub, sig, msg, sizeof(msg));
 	}
 }
 
@@ -165,7 +164,7 @@ void bench_ckd_normal(int iterations)
 		memcpy(&node, &root, sizeof(HDNode));
 		hdnode_public_ckd(&node, i);
 		hdnode_fill_public_key(&node);
-		ecdsa_get_address(node.public_key, HASHER_SHA2, HASHER_SHA2D, 0, addr, sizeof(addr));
+		ecdsa_get_address(node.public_key, 0, addr, sizeof(addr));
 	}
 }
 
@@ -175,7 +174,7 @@ void bench_ckd_optimized(int iterations)
 	curve_point pub;
 	ecdsa_read_pubkey(&secp256k1, root.public_key, &pub);
 	for (int i = 0; i < iterations; i++) {
-		hdnode_public_ckd_address_optimized(&pub, root.chain_code, i, 0, HASHER_SHA2, HASHER_SHA2D, addr, sizeof(addr), false);
+		hdnode_public_ckd_address_optimized(&pub, root.chain_code, i, 0, addr, sizeof(addr), false);
 	}
 }
 

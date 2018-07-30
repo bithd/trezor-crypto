@@ -26,7 +26,6 @@ These include:
 - Chacha20-Poly1305
 - unit tests (using Check - check.sf.net; in test_check.c)
 - tests against OpenSSL (in test_openssl.c)
-- integrated Wycheproof tests
 
 Distibuted under MIT License.
 

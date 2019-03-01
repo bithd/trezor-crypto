@@ -54,6 +54,21 @@ void hasher_InitParam(Hasher *hasher, HasherType type, const void *param, uint32
 	case HASHER_BLAKE2B_PERSONAL:
 		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, hasher->param, 16);
 		break;
+			case HASHER_OVERWINTER_PREVOUTS:
+		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, "ZcashPrevoutHash", 16);
+		break;
+	case HASHER_OVERWINTER_SEQUENCE:
+		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, "ZcashSequencHash", 16);
+		break;
+	case HASHER_OVERWINTER_OUTPUTS:
+		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, "ZcashOutputsHash", 16);
+		break;
+	case HASHER_OVERWINTER_PREIMAGE:
+		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, "ZcashSigHash\x19\x1b\xa8\x5b", 16);  // BRANCH_ID = 0x5ba81b19 / Overwinter
+		break;
+	case HASHER_SAPLING_PREIMAGE:
+		blake2b_InitPersonal(&hasher->ctx.blake2b, 32, "ZcashSigHash\xbb\x09\xb8\x76", 16);  // BRANCH_ID = 0x76b809bb / Sapling
+		break;
 	}
 }
 
@@ -88,6 +103,13 @@ void hasher_Update(Hasher *hasher, const uint8_t *data, size_t length) {
 		break;
 	case HASHER_BLAKE2B:
 	case HASHER_BLAKE2B_PERSONAL:
+		blake2b_Update(&hasher->ctx.blake2b, data, length);
+		break;
+	case HASHER_OVERWINTER_PREVOUTS:
+	case HASHER_OVERWINTER_SEQUENCE:
+	case HASHER_OVERWINTER_OUTPUTS:
+	case HASHER_OVERWINTER_PREIMAGE:
+	case HASHER_SAPLING_PREIMAGE:
 		blake2b_Update(&hasher->ctx.blake2b, data, length);
 		break;
 	}
@@ -130,6 +152,13 @@ void hasher_Final(Hasher *hasher, uint8_t hash[HASHER_DIGEST_LENGTH]) {
 		break;
 	case HASHER_BLAKE2B:
 	case HASHER_BLAKE2B_PERSONAL:
+		blake2b_Final(&hasher->ctx.blake2b, hash, 32);
+		break;
+	case HASHER_OVERWINTER_PREVOUTS:
+	case HASHER_OVERWINTER_SEQUENCE:
+	case HASHER_OVERWINTER_OUTPUTS:
+	case HASHER_OVERWINTER_PREIMAGE:
+	case HASHER_SAPLING_PREIMAGE:
 		blake2b_Final(&hasher->ctx.blake2b, hash, 32);
 		break;
 	}

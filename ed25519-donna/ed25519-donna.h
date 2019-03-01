@@ -19,6 +19,8 @@
 
 #include "modm-donna-32bit.h"
 
+#include "options.h"
+
 typedef unsigned char hash_512bits[64];
 
 /*
